@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -43,6 +44,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -172,7 +174,7 @@ public final class Realm implements Closeable {
 
     // Maps classes to the name of the proxied class. Examples: Dog.class -> Dog, DogRealmProxy -> Dog
     private final Map<Class<?>, String> proxiedClassNames = new HashMap<Class<?>, String>();
-    private final List<RealmChangeListener> changeListeners = new ArrayList<RealmChangeListener>();
+    private final List<WeakReference<RealmChangeListener>> changeListeners = new ArrayList<WeakReference<RealmChangeListener>>();
     private final Map<Class<?>, Table> tables = new HashMap<Class<?>, Table>();
     private static final Set<Class<? extends RealmObject>> customSchema = new HashSet<Class<? extends RealmObject>>();
     private static final long UNVERSIONED = -1;
@@ -1312,7 +1314,7 @@ public final class Realm implements Closeable {
     public <E extends RealmObject> RealmResults<E> allObjectsSorted(Class<E> clazz, String fieldName1,
                                                                boolean sortAscending1, String fieldName2,
                                                                boolean sortAscending2) {
-        return allObjectsSorted(clazz, new String[] {fieldName1, fieldName2}, new boolean[] {sortAscending1,
+        return allObjectsSorted(clazz, new String[]{fieldName1, fieldName2}, new boolean[]{sortAscending1,
                 sortAscending2});
     }
 
@@ -1387,7 +1389,7 @@ public final class Realm implements Closeable {
      */
     public void addChangeListener(RealmChangeListener listener) {
         checkIfValid();
-        changeListeners.add(listener);
+        changeListeners.add(new WeakReference<RealmChangeListener>(listener));
     }
 
     /**
@@ -1398,7 +1400,7 @@ public final class Realm implements Closeable {
      */
     public void removeChangeListener(RealmChangeListener listener) {
         checkIfValid();
-        changeListeners.remove(listener);
+        changeListeners.remove(new WeakReference<RealmChangeListener>(listener));
     }
 
     /**
@@ -1412,9 +1414,14 @@ public final class Realm implements Closeable {
     }
 
     void sendNotifications() {
-        List<RealmChangeListener> defensiveCopy = new ArrayList<RealmChangeListener>(changeListeners);
-        for (RealmChangeListener listener : defensiveCopy) {
-            listener.onChange();
+        Iterator<WeakReference<RealmChangeListener>> iterator = changeListeners.iterator();
+        while (iterator.hasNext()) {
+            RealmChangeListener listener = iterator.next().get();
+            if (listener == null) {
+                iterator.remove();
+            } else {
+                listener.onChange();
+            }
         }
     }
 
