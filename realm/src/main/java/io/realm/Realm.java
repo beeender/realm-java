@@ -25,7 +25,6 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.JsonReader;
 
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -1400,7 +1399,12 @@ public final class Realm implements Closeable {
      */
     public void removeChangeListener(RealmChangeListener listener) {
         checkIfValid();
-        changeListeners.remove(new WeakReference<RealmChangeListener>(listener));
+        Iterator<WeakReference<RealmChangeListener>> iterator = changeListeners.iterator();
+        while (iterator.hasNext()) {
+            if (listener == iterator.next().get()) {
+                iterator.remove();
+            }
+        }
     }
 
     /**
